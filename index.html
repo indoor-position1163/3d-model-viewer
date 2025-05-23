@@ -88,6 +88,7 @@
       camera.attachControl(canvas, true);
 
       const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+      light.intensity = 2.5; // ← デフォルトは 1.0。1.5～2.0 くらいまで上げて試してみてください
 
       blueSphere = BABYLON.MeshBuilder.CreateSphere("blueSphere", {diameter: 120}, scene);
       blueSphere.position = new BABYLON.Vector3(0, 0, -1000);
