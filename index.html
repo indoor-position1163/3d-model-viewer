@@ -95,18 +95,18 @@
       blueMat.diffuseColor = new BABYLON.Color3(0, 0, 1);
       blueSphere.material = blueMat;
 
-      // シアンの透過円（水平）
-      cyanCircle = BABYLON.MeshBuilder.CreateDisc("cyanCircle", {
-        radius: 250,
-        tessellation: 64
+      // シアンの透過球
+      cyanCircle = BABYLON.MeshBuilder.CreateSphere("cyanSphere", {
+        diameter: 250,
+        segments: 32
       }, scene);
-
+      
       const cyanMat = new BABYLON.StandardMaterial("cyanMat", scene);
       cyanMat.diffuseColor = new BABYLON.Color3(0, 1, 1);
       cyanMat.alpha = 0.3;
       cyanCircle.material = cyanMat;
       cyanCircle.position = blueSphere.position.clone();
-      //cyanCircle.rotation.x = Math.PI / 2;
+
 
       // モデル読み込み
       BABYLON.SceneLoader.ImportMesh("", "./", "your_model.glb", scene, function (meshes) {
