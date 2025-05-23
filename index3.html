@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>BABYLON.js GLBモデル＋タグ選択</title>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylon.glTF2FileLoader.js"></script>
+  <style>
+    html, body {
+      margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%;
+    }
+    #renderCanvas {
+      width: 100%; height: 100%; touch-action: none;
+      display: block;
+    }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 10px;
+      border-radius: 4px;
+      z-index: 100;
+    }
+    #directionNote {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255,255,255,0.7);
+      padding: 5px 10px;
+      font-weight: bold;
+      font-size: 16px;
+      z-index: 100;
+    }
+    #lastUpdate {
+      margin-top: 5px;
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <label for="tagSelect">タグID選択：</label>
+    <select id="tagSelect"></select>
+    <button id="updateBtn">更新</button>
+    <div id="lastUpdate">最終更新: -</div>
+  </div>
+  <div id="directionNote">↑ 北</div>
+  <canvas id="renderCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+    let scene, blueSphere, cyanCircle;
+    let csvData = [];
+
+    async function loadCSV(path) {
+      const res = await fetch(path);
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(',');
+      const data = [];
+
+      for(let i = 1; i < lines.length; i++) {
+        const currentline = lines[i].split(',');
+        if(currentline.length !== headers.length) continue;
+        const obj = {};
+        headers.forEach((header, idx) => {
+          obj[header] = currentline[idx];
+        });
+        data.push(obj);
+      }
+      return data;
+    }
+
+    const createScene = () => {
+      scene = new BABYLON.Scene(engine);
+      const initialTarget = new BABYLON.Vector3(2500, 1000, 0);
+
+      const camera = new BABYLON.ArcRotateCamera(
+        "camera",
+        BABYLON.Tools.ToRadians(270),
+        BABYLON.Tools.ToRadians(120),
+        3800,
+        initialTarget.clone(),
+        scene
+      );
+      camera.attachControl(canvas, true);
+
+      const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+      blueSphere = BABYLON.MeshBuilder.CreateSphere("blueSphere", {diameter: 120}, scene);
+      blueSphere.position = new BABYLON.Vector3(0, 0, -1000);
+      const blueMat = new BABYLON.StandardMaterial("blueMat", scene);
+      blueMat.diffuseColor = new BABYLON.Color3(0, 0, 1);
+      blueSphere.material = blueMat;
+
+      // シアンの透過円（水平）
+      cyanCircle = BABYLON.MeshBuilder.CreateDisc("cyanCircle", {
+        radius: 250,
+        tessellation: 64
+      }, scene);
+
+      const cyanMat = new BABYLON.StandardMaterial("cyanMat", scene);
+      cyanMat.diffuseColor = new BABYLON.Color3(0, 1, 1);
+      cyanMat.alpha = 0.3;
+      cyanCircle.material = cyanMat;
+      cyanCircle.position = blueSphere.position.clone();
+      //cyanCircle.rotation.x = Math.PI / 2;
+
+      // モデル読み込み
+      BABYLON.SceneLoader.ImportMesh("", "./", "your_model.glb", scene, function (meshes) {
+        const model = meshes[0];
+        model.position.set(0, 0, 0);
+        model.scaling = new BABYLON.Vector3(-0.1, 0.1, 0.1);
+      });
+
+      // 追従処理
+      scene.registerBeforeRender(() => {
+        cyanCircle.position = blueSphere.position.clone();
+      });
+
+      return scene;
+    };
+
+    async function setup() {
+      scene = createScene();
+      csvData = await loadCSV('AI_output_with_gps.csv');
+
+      const tagSelect = document.getElementById('tagSelect');
+      const uniqueIds = [...new Set(csvData.map(d => d.id))];
+      uniqueIds.forEach(id => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = id;
+        tagSelect.appendChild(option);
+      });
+
+      document.getElementById('updateBtn').addEventListener('click', () => {
+        const selectedId = tagSelect.value;
+        const filtered = csvData.filter(d => d.id === selectedId);
+        if(filtered.length === 0){
+          alert('選択されたIDのデータが見つかりません');
+          return;
+        }
+
+        const latest = filtered[filtered.length -1];
+        blueSphere.position = new BABYLON.Vector3(
+          parseFloat(latest.output_x)/10,
+          parseFloat(latest.output_y)/10,
+          -parseFloat(latest.output_z)/10
+        );
+
+        // カメラとモデルのリセット
+        scene.activeCamera.setTarget(new BABYLON.Vector3(2500, 1000, 0));
+        scene.activeCamera.alpha = BABYLON.Tools.ToRadians(270);
+        scene.activeCamera.beta = BABYLON.Tools.ToRadians(120);
+        scene.activeCamera.radius = 3800;
+
+        // 最終更新時間表示
+        document.getElementById("lastUpdate").textContent = "最終更新: " + latest.time;
+      });
+
+      engine.runRenderLoop(() => {
+        scene.render();
+      });
+    }
+
+    window.addEventListener("resize", () => {
+      engine.resize();
+    });
+
+    setup();
+  </script>
+</body>
+</html>
